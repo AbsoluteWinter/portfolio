@@ -1,0 +1,204 @@
+---
+title: "R - titanic dataset visualization"
+author: 
+  - Nam Hoang
+
+date: "May 25, 2022"
+output:
+  rmdformats::readthedown:
+    self_contained: yes
+  
+header-includes:
+- \usepackage{tikz}
+- \usepackage{pgfplots}
+- \usetikzlibrary{arrows,automata,positioning}
+- \usepackage[utf8]{inputenc}
+- \usepackage[utf8]{vietnam}
+- \usepackage{etoolbox}
+- \usepackage{xcolor}
+- \makeatletter
+- \preto{\@verbatim}{\topsep=0pt \partopsep=-0pt}
+- \makeatother
+- \DeclareMathOperator*{\argmax}{arg\,max}
+- \newcommand\tstrut{\rule{0pt}{3ex}}
+- \newcommand\bstrut{\rule[-2.5ex]{0pt}{0pt}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, cache=FALSE, message=FALSE)
+```
+
+
+# Topic
+
+<div align="justify">
+In this part, we will deal with **titanic** data set. There are 4 main columns in this table namely **Pclass**, **Sex**, **Age**, **Survived**. Try to find any insight information about survival rate of these people (e.g. do their class affect the odds of them surviving? Are women and children really being prioritized for rescue? etc.). You can use any type of graph available on "ggplot2" package: box plot, scatter plot, bar plot, etc. Remember to provide comments on your produced plots.
+
+**Note**: In **Survived** column, 1 denote the customer survived the disaster and vice versa.
+
+## Preparation
+
+```{r}
+# Libraries needed
+library(tidyverse)
+library(grid)
+library(gridExtra)
+```
+
+## Load data
+
+```{r}
+# Load data
+titanic = read_csv("titanic.csv")
+
+# Select needed columns
+dat = titanic %>% select(Pclass, Sex, Age, Survived)
+
+# Missing values handling
+na_val = is.na(dat$Age)
+dat = dat[!na_val,]
+```
+
+```{r}
+dim(dat)
+```
+The new dataset has 4 columns and 714 rows
+
+```{r}
+# Support function
+author = "Nam Hoang"
+draw_pie = function(data, fill_data, title=NULL, author=NULL) {
+  # Draw pie chart
+  
+  fig = data %>%
+    mutate(perc = `n` / sum(`n`)) %>%
+    mutate(labels = scales::percent(perc)) %>%
+    ggplot(aes(x="", n, fill=fill_data)) +
+      geom_bar(stat="identity", width=1, color = "black") +
+      geom_text(aes(label = labels),
+                position = position_stack(vjust = 0.5)) +
+      coord_polar("y", start = 0)
+  
+  if (is.null(title)) {
+    title = ""
+  }
+  
+  if (is.null(author)) {
+    fig = fig + labs(x=NULL, y=NULL, title=title)
+  } else {
+    fig = fig + labs(x=NULL, y=NULL, title=title,
+                     caption = paste("Author:", author, sep=" "))
+  }
+  
+  fig = fig + theme_void()
+  return (fig)
+}
+```
+
+
+## Passenger class
+
+```{r}
+temp = dat %>% mutate(Pclass=as.factor(Pclass)) %>%
+  group_by(Pclass) %>% count() %>% ungroup()
+draw_pie(temp, temp$Pclass, title="Pclass distribution", author=author)
+```
+
+```{r}
+temp = dat %>% filter(Survived==1) %>%
+  mutate(Pclass=as.factor(Pclass)) %>%
+  group_by(Pclass) %>% count() %>% ungroup()
+p1 = draw_pie(temp, temp$Pclass, 
+              title="Pclass distribution (survived)", author=author)
+
+temp = dat %>% filter(Survived==0) %>%
+  mutate(Pclass=as.factor(Pclass)) %>%
+  group_by(Pclass) %>% count() %>% ungroup()
+p2 = draw_pie(temp, temp$Pclass, 
+              title="Pclass distribution (died)", author=author)
+
+grid.arrange(p1, p2, ncol=2)
+```
+
+Passenger class 3 occupied a great proportion with just around 50% of the total passengers. Class 1 and 2 are evenly distributed. Passenger in class 3 has the most death (63.7%) while death rate of class 1 is the lowest (15.1%).
+
+## Sex
+
+```{r}
+temp = dat %>% group_by(Sex) %>% count() %>% ungroup()
+draw_pie(temp, temp$Sex, title="Sex distribution", author=author)
+```
+
+```{r}
+temp = dat %>% filter(Survived==1) %>%
+  group_by(Sex) %>% count() %>% ungroup()
+p3 = draw_pie(temp, temp$Sex, 
+              title="Sex distribution (survived)", author=author)
+
+temp = dat %>% filter(Survived==0) %>%
+  group_by(Sex) %>% count() %>% ungroup()
+p4 = draw_pie(temp, temp$Sex, 
+              title="Sex distribution (died)", author=author)
+
+grid.arrange(p3, p4, ncol=2)
+```
+
+Female passengers almost doubled male passengers. Most of the male passengers died in the accident.
+
+## Age group
+
+```{r}
+# Age group
+age_gr = c("0-14", "15-24", "25-64", "65+")
+# age_gr = c("Children", "Youth", "Adults", "Seniors")
+temp = dat %>% mutate(Age_group = cut(
+  Age, breaks = c(0, 15, 25, 65, Inf), labels = age_gr, right = FALSE)
+  ) %>% group_by(Age_group) %>% count() %>%
+  ungroup()
+draw_pie(temp, temp$Age_group, 
+         title="Age group distribution", author=author)
+```
+
+```{r}
+temp = dat %>% filter(Survived==1) %>%
+  mutate(Age_group = cut(
+  Age, breaks = c(0, 15, 25, 65, Inf), labels = age_gr, right = FALSE)
+  ) %>% group_by(Age_group) %>% count() %>%
+  ungroup()
+p5 = draw_pie(temp, temp$Age_group,
+              title="Age group distribution (survived)", author=author)
+
+temp = dat %>% filter(Survived==0) %>%
+  mutate(Age_group = cut(
+  Age, breaks = c(0, 15, 25, 65, Inf), labels = age_gr, right = FALSE)
+  ) %>% group_by(Age_group) %>% count() %>%
+  ungroup()
+p6 = draw_pie(temp, temp$Age_group,
+              title="Age group distribution (died)", author=author)
+
+grid.arrange(p5, p6, ncol=2)
+```
+
+```{r}
+ggplot(dat) + 
+  geom_histogram(aes(x = Age), bins = 35,
+                 color = "black", fill= "#f8766d") +
+  labs(title = "Age histogram",
+       caption = paste("Author:", author, sep=" "))
+```
+
+Most of the passengers are adults (59.5%), people in age group from 15-24 took the second place with 28%. The percentage of survived and died passengers are relatively equal.
+
+## Survived
+
+```{r}
+temp = dat %>% mutate(Survived=as.factor(Survived)) %>%
+  group_by(Survived) %>% count() %>% ungroup()
+draw_pie(temp, temp$Survived, title="Survived distribution", author=author)
+```
+
+So far, only 41% of the passengers survived.
+
+
+
+
